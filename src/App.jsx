@@ -97,7 +97,7 @@ const menuItems = [
     id: "lumpia",
     name: "Fresh Lumpia",
     category: "Favorites",
-    price: 90,
+    price: 130,
     calories: 210,
     protein: 8,
     description: "Fresh homemade lumpia packed with vegetables and everyday comfort.",
@@ -125,6 +125,12 @@ const reviews = [
   { name: "Jhun P.", text: "Perfect for my fitness goals and still delicious." },
 ];
 
+const menuHighlights = [
+  ["32g+", "average protein"],
+  ["PHP 130", "starts at"],
+  ["8 AM", "weekday start"],
+];
+
 const faqs = [
   { q: "Do you deliver?", a: "Yes. We deliver around Laoag City Centro, with free delivery available within the service zone." },
   { q: "How do I order?", a: "Tap Order Now, message us on Facebook Messenger, or contact us directly by phone." },
@@ -132,6 +138,46 @@ const faqs = [
   { q: "Are your meals prepared daily?", a: "Yes. Every meal is prepared fresh daily using quality vegetables, meats, and dressings." },
   { q: "Do you accept bulk orders?", a: "Yes. We accept group, office, and fitness meal orders with advance notice." },
 ];
+
+const FEEDBACK_STORAGE_KEY = "joe-mama-feedback";
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
+const HAS_SUPABASE = Boolean(SUPABASE_URL && SUPABASE_ANON_KEY);
+
+const formatFeedbackTime = (createdAt) => {
+  if (!createdAt) return "Just now";
+  const minutes = Math.floor((Date.now() - new Date(createdAt).getTime()) / 60000);
+  if (minutes < 1) return "Just now";
+  if (minutes < 60) return `${minutes} min ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours} hr ago`;
+  return new Date(createdAt).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+};
+
+const normalizeFeedback = (item) => ({
+  id: item.id || `${item.name || "guest"}-${item.created_at || item.createdAt || Date.now()}`,
+  name: item.name || "Guest",
+  message: item.message || "",
+  createdAt: item.created_at || item.createdAt || new Date().toISOString(),
+});
+
+const readLocalFeedback = () => {
+  try {
+    return JSON.parse(localStorage.getItem(FEEDBACK_STORAGE_KEY) || "[]").map(normalizeFeedback);
+  } catch {
+    return [];
+  }
+};
+
+const writeLocalFeedback = (items) => {
+  localStorage.setItem(FEEDBACK_STORAGE_KEY, JSON.stringify(items));
+};
+
+const supabaseHeaders = {
+  apikey: SUPABASE_ANON_KEY,
+  Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+  "Content-Type": "application/json",
+};
 
 const useReveal = () => {
   const ref = useRef(null);
@@ -323,12 +369,12 @@ const Nav = ({ darkMode, setDarkMode }) => {
 };
 
 const Hero = () => (
-  <section id="top" className="relative min-h-[92vh] overflow-hidden pt-20">
+  <section id="top" className="relative min-h-[94vh] overflow-hidden pt-20">
     <img src={HERO_IMAGE} alt="Fresh salads and healthy bowls" className="absolute inset-0 h-full w-full object-cover" loading="eager" />
-    <div className="absolute inset-0 bg-gradient-to-b from-black/55 via-black/35 to-black/65" />
+    <div className="absolute inset-0 bg-[radial-gradient(circle_at_78%_24%,rgba(184,115,74,0.34),transparent_32%),linear-gradient(110deg,rgba(0,0,0,0.76)_0%,rgba(0,0,0,0.46)_48%,rgba(0,0,0,0.22)_100%)]" />
 
-    <div className="relative mx-auto flex min-h-[92vh] max-w-6xl flex-col justify-center px-5 pb-14 pt-20 sm:px-8">
-      <Reveal className="max-w-3xl">
+    <div className="relative mx-auto flex min-h-[94vh] max-w-6xl flex-col justify-center px-5 pb-20 pt-20 sm:px-8">
+      <Reveal className="max-w-4xl">
         <div className="mb-5 flex flex-wrap gap-2">
           {["Fresh Daily", "High Protein", "Affordable", "Fast Delivery"].map((item) => (
             <span key={item} className="rounded-full border border-white/30 bg-white/15 px-3 py-1.5 font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-white backdrop-blur">
@@ -336,7 +382,7 @@ const Hero = () => (
             </span>
           ))}
         </div>
-        <h1 className="font-serif text-5xl font-semibold leading-[0.98] text-white sm:text-6xl lg:text-7xl">
+        <h1 className="max-w-3xl font-serif text-5xl font-semibold leading-[0.98] text-white sm:text-6xl lg:text-7xl">
           Healthy Food That Doesn't Taste Like Diet Food.
         </h1>
         <p className="mt-6 max-w-2xl text-lg leading-8 text-white/88 sm:text-xl">
@@ -349,6 +395,17 @@ const Hero = () => (
           <a href="#menu" className="inline-flex items-center justify-center rounded-full border border-white/50 bg-white/10 px-7 py-4 font-bold text-white backdrop-blur transition hover:bg-white/20">
             View Menu
           </a>
+        </div>
+      </Reveal>
+
+      <Reveal delay={180} className="absolute bottom-5 left-5 right-5 sm:left-8 sm:right-8">
+        <div className="ml-auto grid max-w-2xl grid-cols-3 overflow-hidden rounded-2xl border border-white/18 bg-white/12 text-white shadow-2xl backdrop-blur-xl">
+          {menuHighlights.map(([value, label]) => (
+            <div key={label} className="border-r border-white/14 px-4 py-4 last:border-r-0 sm:px-6">
+              <p className="font-serif text-2xl font-semibold leading-none sm:text-3xl">{value}</p>
+              <p className="mt-1 font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-white/68">{label}</p>
+            </div>
+          ))}
         </div>
       </Reveal>
     </div>
@@ -365,26 +422,36 @@ const About = () => {
   ];
 
   return (
-    <section id="about" className="px-5 py-20 sm:px-8">
-      <div className="mx-auto grid max-w-6xl gap-10 lg:grid-cols-[1fr_1.1fr] lg:items-center">
-        <Reveal>
+    <section id="about" className="px-5 py-24 sm:px-8">
+      <div className="mx-auto grid max-w-6xl gap-12 lg:grid-cols-[0.95fr_1.05fr] lg:items-center">
+        <Reveal className="relative min-h-[430px]">
+          <div className="absolute left-0 top-0 h-72 w-[72%] overflow-hidden rounded-[2rem] shadow-2xl sm:h-80">
+            <img src={chickenRiceBowlImage} alt="Chicken rice bowl" className="h-full w-full object-cover" />
+          </div>
+          <div className="absolute bottom-0 right-0 h-64 w-[62%] overflow-hidden rounded-[2rem] border-[10px] shadow-xl" style={{ borderColor: COLORS.cream }}>
+            <img src={freshLumpiaImage} alt="Fresh lumpia" className="h-full w-full object-cover" />
+          </div>
+          <div className="absolute bottom-14 left-4 rounded-2xl px-5 py-4 text-white shadow-xl" style={{ background: COLORS.clay }}>
+            <p className="font-serif text-3xl font-semibold leading-none">Fresh</p>
+            <p className="mt-1 font-mono text-[10px] font-bold uppercase tracking-[0.18em]">prepared daily</p>
+          </div>
+        </Reveal>
+        <Reveal delay={120}>
           <SectionLabel>About Joe Mama</SectionLabel>
           <h2 className="mt-3 font-serif text-4xl font-semibold leading-tight sm:text-5xl" style={{ color: COLORS.forest }}>
             Healthy eating made simple, delicious, and accessible.
           </h2>
-        </Reveal>
-        <Reveal delay={120}>
-          <p className="text-lg leading-8 opacity-80">
+          <p className="mt-6 text-lg leading-8 opacity-80">
             Joe Mama was created with one mission: to make healthy eating simple, delicious, and accessible.
             Every meal is prepared using fresh ingredients to give you the nutrition you need without compromising flavor.
           </p>
-          <div className="mt-8 grid grid-cols-2 gap-4 sm:grid-cols-5">
+          <div className="mt-8 grid grid-cols-2 gap-3 sm:grid-cols-3">
             {items.map(([Icon, label]) => (
-              <div key={label} className="rounded-2xl border p-4 text-center shadow-sm" style={{ background: "rgba(255,255,255,0.68)", borderColor: "#1E3A2B14" }}>
-                <div className="mx-auto grid h-12 w-12 place-items-center rounded-full text-white" style={{ background: COLORS.forest }}>
+              <div key={label} className="flex items-center gap-3 rounded-2xl border px-4 py-3 shadow-sm" style={{ background: "rgba(255,255,255,0.68)", borderColor: "#1E3A2B14" }}>
+                <div className="grid h-10 w-10 shrink-0 place-items-center rounded-full text-white" style={{ background: COLORS.forest }}>
                   <Icon size={20} />
                 </div>
-                <p className="mt-3 text-xs font-bold leading-5">{label}</p>
+                <p className="text-xs font-bold leading-5">{label}</p>
               </div>
             ))}
           </div>
@@ -409,17 +476,20 @@ const MenuSection = () => {
   }, [category, query]);
 
   return (
-    <section id="menu" className="px-5 py-20 sm:px-8" style={{ background: COLORS.cream }}>
+    <section id="menu" className="px-5 py-24 sm:px-8" style={{ background: COLORS.cream }}>
       <div className="mx-auto max-w-6xl">
         <Reveal>
-          <div className="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
-            <div>
+          <div className="grid gap-5 lg:grid-cols-[1fr_0.72fr] lg:items-end">
+            <div className="max-w-2xl">
               <SectionLabel>Featured Menu</SectionLabel>
-              <h2 className="mt-3 font-serif text-4xl font-semibold sm:text-5xl" style={{ color: COLORS.forest }}>
+              <h2 className="mt-3 font-serif text-4xl font-semibold leading-tight sm:text-5xl" style={{ color: COLORS.forest }}>
                 Fresh fuel for busy days.
               </h2>
+              <p className="mt-4 text-base leading-7 opacity-70">
+                A short, focused menu keeps ordering easy while each meal still gets its own character.
+              </p>
             </div>
-            <a href="#contact" className="inline-flex items-center justify-center gap-2 self-start rounded-full px-5 py-3 text-sm font-bold text-white shadow-lg transition hover:-translate-y-0.5 sm:self-auto" style={{ background: COLORS.forest }}>
+            <a href="#contact" className="inline-flex items-center justify-center gap-2 justify-self-start rounded-full px-5 py-3 text-sm font-bold text-white shadow-lg transition hover:-translate-y-0.5 lg:justify-self-end" style={{ background: COLORS.forest }}>
               <MessageCircle size={16} />
               Order via Messenger
             </a>
@@ -454,19 +524,24 @@ const MenuSection = () => {
           </div>
         </Reveal>
 
-        <div className="mt-9 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="mt-9 grid auto-rows-fr gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {filtered.map((item, index) => (
-            <Reveal key={item.id} delay={index * 55}>
-              <article className="group overflow-hidden rounded-2xl border bg-white shadow-sm transition duration-300 hover:-translate-y-1 hover:shadow-2xl" style={{ borderColor: "#1E3A2B14" }}>
-                <div className="relative aspect-[4/3] overflow-hidden">
+            <Reveal key={item.id} delay={index * 55} className={index === 0 ? "sm:col-span-2" : ""}>
+              <article
+                className={`group grid h-full overflow-hidden rounded-2xl border bg-white shadow-sm transition duration-300 hover:-translate-y-1 hover:shadow-2xl ${
+                  index === 0 ? "lg:grid-cols-[1.05fr_0.95fr]" : ""
+                }`}
+                style={{ borderColor: "#1E3A2B14" }}
+              >
+                <div className={`relative overflow-hidden ${index === 0 ? "min-h-72" : "aspect-[4/3]"}`}>
                   <img src={item.image} alt={item.name} loading="lazy" className="h-full w-full object-cover transition duration-500 group-hover:scale-105" />
                   <div className="absolute left-4 top-4">
                     <Price value={item.price} />
                   </div>
                 </div>
-                <div className="p-5">
+                <div className={`flex flex-col p-5 ${index === 0 ? "justify-center sm:p-8" : ""}`}>
                   <div className="flex items-start justify-between gap-3">
-                    <h3 className="font-serif text-2xl font-semibold" style={{ color: COLORS.forest }}>
+                    <h3 className={`font-serif font-semibold ${index === 0 ? "text-3xl sm:text-4xl" : "text-2xl"}`} style={{ color: COLORS.forest }}>
                       {item.name}
                     </h3>
                     <span className="rounded-full px-3 py-1 text-xs font-bold" style={{ background: COLORS.sand, color: COLORS.forest }}>
@@ -507,16 +582,26 @@ const WhyChoose = () => {
   ];
 
   return (
-    <section className="px-5 py-20 text-white sm:px-8" style={{ background: COLORS.forest }}>
+    <section className="px-5 py-24 text-white sm:px-8" style={{ background: COLORS.forest }}>
       <div className="mx-auto max-w-6xl">
         <Reveal>
-          <SectionLabel dark>Why Choose Joe Mama</SectionLabel>
-          <h2 className="mt-3 font-serif text-4xl font-semibold sm:text-5xl">Premium quality, everyday prices.</h2>
+          <div className="grid gap-5 lg:grid-cols-[0.82fr_1fr] lg:items-end">
+            <div>
+              <SectionLabel dark>Why Choose Joe Mama</SectionLabel>
+              <h2 className="mt-3 font-serif text-4xl font-semibold leading-tight sm:text-5xl">Premium quality, everyday prices.</h2>
+            </div>
+            <p className="max-w-xl text-base leading-7 text-white/70 lg:justify-self-end">
+              The brand promise is simple: meals that feel good enough for lunch break, gym days, and repeat orders.
+            </p>
+          </div>
         </Reveal>
-        <div className="mt-10 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="mt-10 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
           {items.map(([Icon, title, desc], index) => (
-            <Reveal key={title} delay={index * 55}>
-              <div className="h-full rounded-2xl border border-white/10 p-6" style={{ background: "rgba(255,255,255,0.06)" }}>
+            <Reveal key={title} delay={index * 55} className={index === 0 || index === 3 ? "lg:col-span-2" : ""}>
+              <div
+                className="h-full rounded-2xl border border-white/10 p-6"
+                style={{ background: index === 0 ? "rgba(165,191,104,0.16)" : "rgba(255,255,255,0.06)" }}
+              >
                 <Icon size={28} color={COLORS.herb} />
                 <h3 className="mt-4 text-lg font-bold">{title}</h3>
                 <p className="mt-2 text-sm leading-6 text-white/72">{desc}</p>
@@ -537,23 +622,28 @@ const HowItWorks = () => {
   ];
 
   return (
-    <section className="px-5 py-20 sm:px-8" style={{ background: COLORS.sand }}>
-      <div className="mx-auto max-w-5xl text-center">
+    <section className="px-5 py-24 sm:px-8" style={{ background: COLORS.sand }}>
+      <div className="mx-auto grid max-w-6xl gap-10 lg:grid-cols-[0.68fr_1fr] lg:items-start">
         <Reveal>
           <SectionLabel>How Ordering Works</SectionLabel>
-          <h2 className="mt-3 font-serif text-4xl font-semibold sm:text-5xl" style={{ color: COLORS.forest }}>
+          <h2 className="mt-3 font-serif text-4xl font-semibold leading-tight sm:text-5xl" style={{ color: COLORS.forest }}>
             Three steps. Fresh food.
           </h2>
+          <p className="mt-5 text-base leading-7 opacity-70">
+            No complicated cart. Pick a meal, send a message, and confirm delivery.
+          </p>
         </Reveal>
-        <div className="mt-12 grid gap-6 sm:grid-cols-3">
+        <div className="grid gap-4">
           {steps.map(([title, desc], index) => (
             <Reveal key={title} delay={index * 90}>
-              <div className="rounded-2xl bg-white p-6 shadow-sm">
-                <div className="mx-auto grid h-16 w-16 place-items-center rounded-full font-serif text-2xl font-bold text-white" style={{ background: index === 1 ? COLORS.clay : COLORS.leaf }}>
-                  {index + 1}
+              <div className="grid gap-4 rounded-2xl bg-white p-5 shadow-sm sm:grid-cols-[4.5rem_1fr] sm:items-center">
+                <div className="grid h-16 w-16 place-items-center rounded-full font-serif text-2xl font-bold text-white" style={{ background: index === 1 ? COLORS.clay : COLORS.leaf }}>
+                  0{index + 1}
                 </div>
-                <h3 className="mt-5 text-lg font-bold" style={{ color: COLORS.forest }}>{title}</h3>
-                <p className="mt-2 text-sm leading-6 opacity-75">{desc}</p>
+                <div>
+                  <h3 className="text-lg font-bold" style={{ color: COLORS.forest }}>{title}</h3>
+                  <p className="mt-2 text-sm leading-6 opacity-75">{desc}</p>
+                </div>
               </div>
             </Reveal>
           ))}
@@ -574,10 +664,15 @@ const Reviews = () => {
   }, []);
 
   return (
-    <section className="px-5 py-20 sm:px-8" style={{ background: COLORS.cream }}>
-      <Reveal className="mx-auto max-w-3xl text-center">
-        <SectionLabel>Customer Reviews</SectionLabel>
-        <div className="mt-7 rounded-3xl border bg-white p-8 shadow-sm" style={{ borderColor: "#1E3A2B14" }}>
+    <section className="px-5 py-24 sm:px-8" style={{ background: COLORS.cream }}>
+      <Reveal className="mx-auto grid max-w-6xl gap-8 lg:grid-cols-[0.48fr_1fr] lg:items-center">
+        <div>
+          <SectionLabel>Customer Reviews</SectionLabel>
+          <h2 className="mt-3 font-serif text-4xl font-semibold leading-tight sm:text-5xl" style={{ color: COLORS.forest }}>
+            Real notes from people who order again.
+          </h2>
+        </div>
+        <div className="rounded-3xl border bg-white p-8 shadow-sm" style={{ borderColor: "#1E3A2B14" }}>
           <div className="mb-5 flex justify-center gap-1">
             {Array.from({ length: 5 }).map((_, i) => (
               <Star key={i} size={20} fill={COLORS.clay} color={COLORS.clay} />
@@ -688,35 +783,109 @@ const Contact = () => {
   const [errors, setErrors] = useState({});
   const [sent, setSent] = useState(false);
   const [feedback, setFeedback] = useState([]);
+  const [loadingFeedback, setLoadingFeedback] = useState(true);
+  const [feedbackError, setFeedbackError] = useState("");
+  const [submitting, setSubmitting] = useState(false);
 
-  const submit = (event) => {
+  useEffect(() => {
+    const loadFeedback = async () => {
+      setLoadingFeedback(true);
+      setFeedbackError("");
+      await fetchFeedback();
+      setLoadingFeedback(false);
+    };
+
+    const fetchFeedback = async () => {
+      if (!HAS_SUPABASE) {
+        setFeedback(readLocalFeedback());
+        return;
+      }
+
+      try {
+        const response = await fetch(
+          `${SUPABASE_URL}/rest/v1/feedback?select=id,name,message,created_at&order=created_at.desc&limit=20`,
+          { headers: supabaseHeaders }
+        );
+
+        if (!response.ok) throw new Error("Unable to load feedback.");
+
+        const data = await response.json();
+        setFeedback(data.map(normalizeFeedback));
+      } catch {
+        setFeedbackError("Feedback could not load right now.");
+      }
+    };
+
+    loadFeedback();
+
+    if (!HAS_SUPABASE) return undefined;
+
+    const refreshTimer = window.setInterval(fetchFeedback, 15000);
+    return () => window.clearInterval(refreshTimer);
+  }, []);
+
+  const submit = async (event) => {
     event.preventDefault();
     const nextErrors = {};
     if (!form.name.trim()) nextErrors.name = "Please enter your name.";
     if (!/^\S+@\S+\.\S+$/.test(form.email)) nextErrors.email = "Please enter a valid email.";
     if (!form.message.trim()) nextErrors.message = "Please write your feedback.";
+    if (form.message.trim().length > 240) nextErrors.message = "Please keep feedback under 240 characters.";
     setErrors(nextErrors);
     if (Object.keys(nextErrors).length === 0) {
-      setFeedback((items) => [
-        {
-          id: Date.now(),
-          name: form.name.trim(),
-          message: form.message.trim(),
-          time: "Just now",
-        },
-        ...items,
-      ]);
-      setSent(true);
-      setForm({ name: "", email: "", message: "" });
+      setSubmitting(true);
+      setFeedbackError("");
+
+      const nextFeedback = {
+        id: typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : String(Date.now()),
+        name: form.name.trim(),
+        message: form.message.trim(),
+        createdAt: new Date().toISOString(),
+      };
+
+      try {
+        if (HAS_SUPABASE) {
+          const response = await fetch(`${SUPABASE_URL}/rest/v1/feedback`, {
+            method: "POST",
+            headers: { ...supabaseHeaders, Prefer: "return=representation" },
+            body: JSON.stringify({
+              name: nextFeedback.name,
+              message: nextFeedback.message,
+            }),
+          });
+
+          if (!response.ok) throw new Error("Unable to save feedback.");
+
+          const [savedFeedback] = await response.json();
+          setFeedback((items) => [normalizeFeedback(savedFeedback), ...items]);
+        } else {
+          setFeedback((items) => {
+            const updated = [nextFeedback, ...items].slice(0, 20);
+            writeLocalFeedback(updated);
+            return updated;
+          });
+        }
+
+        setSent(true);
+        setForm({ name: "", email: "", message: "" });
+      } catch {
+        setFeedbackError("Your feedback could not be saved. Please try again.");
+      } finally {
+        setSubmitting(false);
+      }
     }
   };
 
   return (
-    <section id="contact" className="px-5 py-20 text-white sm:px-8" style={{ background: COLORS.forest }}>
-      <div className="mx-auto grid max-w-6xl gap-10 lg:grid-cols-[0.9fr_1.1fr]">
-        <Reveal>
+    <section id="contact" className="relative overflow-hidden px-5 py-24 text-white sm:px-8" style={{ background: COLORS.forest }}>
+      <div className="absolute inset-x-0 top-0 h-px bg-white/15" />
+      <div className="mx-auto grid max-w-6xl gap-10 lg:grid-cols-[0.78fr_1.22fr] lg:items-start">
+        <Reveal className="lg:sticky lg:top-28">
           <SectionLabel dark>Contact & Feedback</SectionLabel>
-          <h2 className="mt-3 font-serif text-4xl font-semibold sm:text-5xl">Tell us what you think.</h2>
+          <h2 className="mt-3 font-serif text-4xl font-semibold leading-tight sm:text-5xl">Tell us what you think.</h2>
+          <p className="mt-5 max-w-md text-base leading-7 text-white/70">
+            Order through Messenger or leave a quick note. Feedback appears here after it is saved.
+          </p>
           <div className="mt-8 space-y-4 text-white/82">
             <a href="https://www.facebook.com/profile.php?id=61574436017896" className="flex items-center gap-3 transition hover:text-white">
               <Facebook size={20} color={COLORS.herb} /> facebook.com/joemamaph
@@ -724,18 +893,32 @@ const Contact = () => {
             <a href="tel:+639079483551" className="flex items-center gap-3 transition hover:text-white">
               <Phone size={20} color={COLORS.herb} /> +63 907 948 3551
             </a>
-            <p className="flex items-center gap-3"><Clock size={20} color={COLORS.herb} /> Monday to Friday, 8:00 AM to 9:00 PM</p>
+            <p className="flex items-center gap-3"><Clock size={20} color={COLORS.herb} /> Monday to Friday, 8:00 AM to 5:00 PM</p>
             <p className="flex items-center gap-3"><Truck size={20} color={COLORS.herb} /> Free delivery around Laoag City Centro</p>
             <p className="flex items-center gap-3"><MapPin size={20} color={COLORS.herb} /> Laoag City Centro, Ilocos Norte</p>
           </div>
           <a href="https://www.facebook.com/profile.php?id=61574436017896" className="mt-8 inline-flex items-center gap-2 rounded-full px-7 py-4 font-bold text-white transition hover:scale-105" style={{ background: COLORS.leaf }}>
             <MessageCircle size={18} /> Order Now
           </a>
+          <div className="mt-10 grid max-w-sm grid-cols-2 overflow-hidden rounded-2xl border border-white/10">
+            <div className="p-4" style={{ background: "rgba(255,255,255,0.06)" }}>
+              <p className="font-serif text-3xl font-semibold">{feedback.length}</p>
+              <p className="mt-1 font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-white/58">comments</p>
+            </div>
+            <div className="border-l border-white/10 p-4" style={{ background: "rgba(255,255,255,0.04)" }}>
+              <p className="font-serif text-3xl font-semibold">15s</p>
+              <p className="mt-1 font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-white/58">refresh</p>
+            </div>
+          </div>
         </Reveal>
 
         <Reveal delay={120}>
-          <div className="grid gap-5">
-            <div className="rounded-3xl border border-white/10 p-5 sm:p-6" style={{ background: "rgba(255,255,255,0.06)" }}>
+          <div className="grid gap-5 lg:grid-cols-[0.92fr_1.08fr]">
+            <div className="rounded-3xl border border-white/10 p-5 shadow-2xl sm:p-6" style={{ background: "rgba(255,255,255,0.08)" }}>
+              <div className="mb-5">
+                <h3 className="text-xl font-bold">Leave Feedback</h3>
+                <p className="mt-1 text-sm text-white/62">Short, helpful notes work best.</p>
+              </div>
               {sent && (
                 <div className="mb-5 flex items-center gap-3 rounded-2xl border border-white/10 px-4 py-3" style={{ background: "rgba(107,156,74,0.18)" }}>
                   <div className="grid h-9 w-9 shrink-0 place-items-center rounded-full" style={{ background: COLORS.leaf }}>
@@ -748,6 +931,11 @@ const Contact = () => {
                   <button className="ml-auto text-sm font-bold text-white/70 hover:text-white" onClick={() => setSent(false)} aria-label="Dismiss feedback notice">
                     <X size={17} />
                   </button>
+                </div>
+              )}
+              {feedbackError && (
+                <div className="mb-5 rounded-2xl border border-[#FFD0B8]/40 px-4 py-3 text-sm text-[#FFD0B8]" style={{ background: "rgba(184,115,74,0.16)" }}>
+                  {feedbackError}
                 </div>
               )}
               <form onSubmit={submit} className="space-y-4" noValidate>
@@ -764,30 +952,42 @@ const Contact = () => {
                 <div>
                   <label className="mb-2 block text-sm font-bold" htmlFor="message">Feedback</label>
                   <textarea id="message" rows={5} value={form.message} onChange={(event) => setForm({ ...form, message: event.target.value })} className="w-full resize-none rounded-2xl border-0 px-4 py-3 text-sm text-[#232620] outline-none" placeholder="Tell us your feedback. Thank you for supporting Joe Mama." />
-                  {errors.message && <p className="mt-1 text-xs text-[#FFD0B8]">{errors.message}</p>}
+                  <div className="mt-1 flex items-center justify-between gap-3 text-xs">
+                    {errors.message ? <p className="text-[#FFD0B8]">{errors.message}</p> : <span />}
+                    <p className="text-white/48">{form.message.length}/240</p>
+                  </div>
                 </div>
-                <button type="submit" className="inline-flex w-full items-center justify-center gap-2 rounded-full px-5 py-4 font-bold text-white transition hover:scale-[1.01]" style={{ background: COLORS.leaf }}>
-                  <Send size={17} /> Send Feedback
+                <button
+                  type="submit"
+                  disabled={submitting}
+                  className="inline-flex w-full items-center justify-center gap-2 rounded-full px-5 py-4 font-bold text-white transition hover:scale-[1.01] disabled:cursor-not-allowed disabled:opacity-70"
+                  style={{ background: COLORS.leaf }}
+                >
+                  <Send size={17} /> {submitting ? "Saving Feedback..." : "Send Feedback"}
                 </button>
               </form>
             </div>
 
-            <div className="rounded-3xl border border-white/10 p-5 sm:p-6" style={{ background: "rgba(255,255,255,0.06)" }}>
+            <div className="rounded-3xl border border-white/10 p-5 shadow-2xl sm:p-6" style={{ background: "rgba(255,255,255,0.06)" }}>
               <div className="flex items-end justify-between gap-4">
                 <div>
-                  <h3 className="text-lg font-bold">Customer Feedback</h3>
-                  <p className="mt-1 text-sm text-white/68">Recent comments from visitors will appear here.</p>
+                  <h3 className="text-xl font-bold">Feedback Wall</h3>
+                  <p className="mt-1 text-sm text-white/68">Recent comments from visitors.</p>
                 </div>
                 <span className="rounded-full px-3 py-1 font-mono text-xs font-bold" style={{ background: COLORS.leaf }}>
                   {feedback.length}
                 </span>
               </div>
-              {feedback.length === 0 ? (
+              {loadingFeedback ? (
                 <div className="mt-5 rounded-2xl border border-white/10 p-5 text-sm leading-6 text-white/68" style={{ background: "rgba(255,255,255,0.05)" }}>
-                  No feedback yet. Once live comments are connected, customer feedback will load here in real time.
+                  Loading feedback...
+                </div>
+              ) : feedback.length === 0 ? (
+                <div className="mt-5 rounded-2xl border border-white/10 p-5 text-sm leading-6 text-white/68" style={{ background: "rgba(255,255,255,0.05)" }}>
+                  No feedback yet. Be the first to leave a comment.
                 </div>
               ) : (
-                <div className="mt-5 grid gap-3">
+                <div className="mt-5 grid max-h-[34rem] gap-3 overflow-y-auto pr-1">
                   {feedback.map((item) => (
                     <article key={item.id} className="rounded-2xl bg-white p-4 text-[#232620] shadow-sm">
                       <div className="flex items-center gap-3">
@@ -796,7 +996,7 @@ const Contact = () => {
                         </div>
                         <div className="min-w-0">
                           <h4 className="truncate text-sm font-bold" style={{ color: COLORS.forest }}>{item.name}</h4>
-                          <p className="font-mono text-[11px] uppercase tracking-[0.16em] opacity-50">{item.time}</p>
+                          <p className="font-mono text-[11px] uppercase tracking-[0.16em] opacity-50">{formatFeedbackTime(item.createdAt)}</p>
                         </div>
                       </div>
                       <p className="mt-3 text-sm leading-6 opacity-80">"{item.message}"</p>

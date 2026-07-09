@@ -130,14 +130,43 @@ Current expected filenames:
 
 ## Feedback Notes
 
-The feedback section is currently frontend-only:
+The feedback section has two modes:
 
-- New comments appear immediately after submission
-- Comments are stored only in React state
-- Comments disappear after refresh
-- Other visitors will not see them yet
+- Without Supabase env vars, comments are saved in the visitor's browser only.
+- With Supabase env vars, comments are saved publicly and loaded by all visitors.
 
-For public realtime comments, connect the feedback form to a backend/database such as Firebase, Supabase, or a custom API.
+For public comments on Vercel, create a Supabase table named `feedback`.
+
+```sql
+create table feedback (
+  id uuid primary key default gen_random_uuid(),
+  name text not null,
+  message text not null,
+  created_at timestamptz not null default now()
+);
+
+alter table feedback enable row level security;
+
+create policy "Anyone can read feedback"
+on feedback for select
+using (true);
+
+create policy "Anyone can post feedback"
+on feedback for insert
+with check (
+  length(trim(name)) between 1 and 80
+  and length(trim(message)) between 1 and 500
+);
+```
+
+Then add these environment variables in Vercel:
+
+```text
+VITE_SUPABASE_URL
+VITE_SUPABASE_ANON_KEY
+```
+
+Use `.env.example` as the local template. After adding env vars in Vercel, redeploy the site.
 
 ## Deployment
 
